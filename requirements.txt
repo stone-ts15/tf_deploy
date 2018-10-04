@@ -1,0 +1,11 @@
+opencv-python
+numpy
+networkx
+pymongo
+requests
+flask
+imutils
+qcloud_image
+google-cloud-vision==0.33
+numba
+Pillow
