@@ -9,7 +9,12 @@ import numpy as np
 import tensorflow as tf
 import record
 import visualization
-import build
+#import build
+import reader
+
+import sys
+sys.path = [i.replace('/home/ylxiong/models/research',
+                    '/home/yanglei/models/research') for i in sys.path]
 
 from deeplab.datasets import segmentation_dataset
 from deeplab.utils import input_generator, save_annotation
@@ -19,29 +24,25 @@ from deeplab import common, model
 # from seg2skel.utils import text as text_utils
 # from seg2skel.utils import match_tpl as mtpl_utils
 # from seg2skel.utils import skel as skel_utils
-import skel_extract
+#import skel_extract
 import mycommon
 
 slim = tf.contrib.slim
 
 program_dir = '/home/chr/sgy/web/program'
 work_dir = os.path.join(program_dir, 'assets', 'datasets')
+work_dir = '/DATA/ylxiong/homeplus/'
 
-A_vis_logdir = work_dir
-A_checkpoint_dir = os.path.join(work_dir, 'exp', 'train_on_train_set', 'train/')
+A_checkpoint_dir = os.path.join(work_dir, 'exp', 'train_on_train_set_data2_xception_65_513x513', 'train/')
 
 A_master = ''
 
-reader_graph = None
-reader = None
-vis_graph = None
-vis_session = None
 supervisor = None
 prepare_graph = None
 
 A_dataset = 'homeplus'
 A_vis_split = 'val'
-A_dataset_dir = os.path.join(work_dir, 'tfrecord')
+A_dataset_dir = os.path.join(work_dir, 'test_tfrecord')
 
 A_min_resize_value = None
 A_max_resize_value = None
@@ -60,13 +61,7 @@ _PREDICTION_FORMAT = '{}_prediction'
 _SEMANTIC_PREDICTION_SAVE_FOLDER = 'segmentation_results'
 _RAW_SEMANTIC_PREDICTION_SAVE_FOLDER = 'raw_segmentation_results'
 
-def get_reader():
-    global reader
-    global reader_graph
-    if reader is None:
-        reader_graph = tf.Graph()
-        reader = build.ImageReader(reader_graph, None, 'jpeg', 3)
-    return reader
+A_vis_logdir = os.path.join(work_dir, _SEMANTIC_PREDICTION_SAVE_FOLDER)
 
 def get_supervisor():
     global supervisor
@@ -87,18 +82,6 @@ def get_supervisor():
 
     return supervisor
 
-def get_session():
-    global vis_graph
-    global vis_session
-    if vis_session is None:
-        vis_graph = tf.Graph()
-        with vis_graph.as_default():
-            tf.train.get_or_create_global_step()
-            vis_session = tf.Session(graph=vis_graph)
-            saver = tf.train.Saver(slim.get_variables_to_restore())
-            saver.restore(vis_session, tf.train.latest_checkpoint(A_checkpoint_dir))
-
-    return vis_session
 
 def get_prepare_graph():
     global prepare_graph
@@ -107,8 +90,8 @@ def get_prepare_graph():
     return prepare_graph
 
 def movefile(filepath):
-    pascal_root = os.path.join(work_dir, 'data')
-    output_dir = os.path.join(work_dir, 'tfrecord')
+    pascal_root = os.path.join(work_dir, 'test_data')
+    output_dir = os.path.join(work_dir, 'test_tfrecord')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     image_folder = os.path.join(pascal_root, 'JPEGImages')
@@ -124,18 +107,6 @@ def movefile(filepath):
             of.write(fn[:fn.rfind('.')])
 
 def do_prepare():
-    dataset = segmentation_dataset.get_dataset(A_dataset, A_vis_split, dataset_dir=A_dataset_dir)
-
-    samples = input_generator.get(dataset,
-                                  A_vis_crop_size,
-                                  A_vis_batch_size,
-                                  min_resize_value=A_min_resize_value,
-                                  max_resize_value=A_max_resize_value,
-                                  resize_factor=A_resize_factor,
-                                  dataset_split=A_vis_split,
-                                  is_training=False,
-                                  model_variant=A_model_variant)
-
     model_options = mycommon.ModelOptions(
         outputs_to_num_classes={common.OUTPUT_TYPE: dataset.num_classes},
         crop_size=A_vis_crop_size,
@@ -190,12 +161,9 @@ def do_process_batch(sess, samples, predictions):
                    save_dir)
 
 def process_one(filepath):
-    global reader_graph
-    global vis_graph
 
     movefile(filepath)
-    with reader_graph.as_default():
-        record.write_record(None, get_reader())
+    record.write_record(None, reader)
 
 
     # with get_prepare_graph().as_default():
@@ -209,19 +177,65 @@ def process_one(filepath):
     #         skel_extract.extract()
     #         skel_extract.load()
 
+
+
+    vis_graph = tf.Graph()
     with vis_graph.as_default():
-        with get_session().as_default():
-            samples, predictions = do_prepare()
-            tf.train.get_or_create_global_step()
-            do_process_batch(get_session(), samples, predictions)
+        dataset = segmentation_dataset.get_dataset(A_dataset, A_vis_split, dataset_dir=A_dataset_dir)
+        samples = input_generator.get(dataset,
+                                  A_vis_crop_size,
+                                  A_vis_batch_size,
+                                  min_resize_value=A_min_resize_value,
+                                  max_resize_value=A_max_resize_value,
+                                  resize_factor=A_resize_factor,
+                                  dataset_split=A_vis_split,
+                                  is_training=False,
+                                  model_variant=A_model_variant)
+        model_options = mycommon.ModelOptions(
+            outputs_to_num_classes={common.OUTPUT_TYPE: dataset.num_classes},
+            crop_size=A_vis_crop_size,
+            atrous_rates=A_atrous_rates,
+            output_stride=A_output_stride
+        )
+        print(samples[common.IMAGE])
+
+        predictions = model.predict_labels(samples[common.IMAGE],
+                                           model_options=model_options,
+                                           image_pyramid=A_image_pyramid)
+
+        predictions = predictions[common.OUTPUT_TYPE]
+
+        tf.train.get_or_create_global_step()
+        vis_session = tf.Session(graph=vis_graph)
+        saver = tf.train.Saver(slim.get_variables_to_restore())
+        sv = tf.train.Supervisor(graph=vis_graph,
+                             logdir=A_vis_logdir,
+                             init_op=tf.global_variables_initializer(),
+                             summary_op=None,
+                             summary_writer=None,
+                             global_step=None,
+                             saver=saver)
+        with sv.managed_session('', start_standard_services=False) as sess:
+            sv.start_queue_runners(sess)
+            sv.saver.restore(sess, tf.train.latest_checkpoint(A_checkpoint_dir))
+            #samples, predictions = do_prepare()
+            #tf.train.get_or_create_global_step()
+            #do_process_batch(get_session(), samples, predictions)
+            save_dir = os.path.join(work_dir, _SEMANTIC_PREDICTION_SAVE_FOLDER)
+
+            my_process_batch(sess,
+                           samples[common.ORIGINAL_IMAGE],
+                           predictions,
+                           samples[common.IMAGE_NAME],
+                           samples[common.HEIGHT],
+                           samples[common.WIDTH],
+                           save_dir)
 
 
 def all_proc():
-    get_reader()
     # get_supervisor()
-    get_session()
-    process_one('/home/chr/sgy/a.jpg')
-    process_one('/home/chr/sgy/b.jpg')
+    process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(10).jpg')
+    process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(11).jpg')
 
 
 def serve(filepath):
