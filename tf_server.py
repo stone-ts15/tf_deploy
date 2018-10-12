@@ -231,11 +231,73 @@ def process_one(filepath):
                            samples[common.WIDTH],
                            save_dir)
 
+def test():
+    vis_graph = tf.Graph()
+    with vis_graph.as_default():
+        dataset = segmentation_dataset.get_dataset(A_dataset, A_vis_split, dataset_dir=A_dataset_dir)
+        samples = input_generator.get(dataset,
+                                  A_vis_crop_size,
+                                  A_vis_batch_size,
+                                  min_resize_value=A_min_resize_value,
+                                  max_resize_value=A_max_resize_value,
+                                  resize_factor=A_resize_factor,
+                                  dataset_split=A_vis_split,
+                                  is_training=False,
+                                  model_variant=A_model_variant)
+        model_options = mycommon.ModelOptions(
+            outputs_to_num_classes={common.OUTPUT_TYPE: dataset.num_classes},
+            crop_size=A_vis_crop_size,
+            atrous_rates=A_atrous_rates,
+            output_stride=A_output_stride
+        )
+        print(samples[common.IMAGE])
+
+        predictions = model.predict_labels(samples[common.IMAGE],
+                                           model_options=model_options,
+                                           image_pyramid=A_image_pyramid)
+
+        predictions = predictions[common.OUTPUT_TYPE]
+
+        tf.train.get_or_create_global_step()
+        #vis_session = tf.Session(graph=vis_graph)
+        saver = tf.train.Saver(slim.get_variables_to_restore())
+        sv = tf.train.Supervisor(graph=vis_graph,
+                             logdir=A_vis_logdir,
+                             init_op=tf.global_variables_initializer(),
+                             summary_op=None,
+                             summary_writer=None,
+                             global_step=None,
+                             saver=saver)
+
+        vis_one(vis_graph, '/DATA/ylxiong/homeplus/data_general/JPEGImages/building(11).jpg', samples, predictions, sv)
+        vis_one(vis_graph, '/DATA/ylxiong/homeplus/data_general/JPEGImages/building(12).jpg', samples, predictions, sv)
+        vis_one(vis_graph, '/DATA/ylxiong/homeplus/data_general/JPEGImages/building(13).jpg', samples, predictions, sv)
+
+
+def vis_one(vis_graph, filepath, samples, predictions, sv):
+        movefile(filepath)
+        record.write_record(None, reader)
+        with sv.managed_session('', start_standard_services=False) as sess:
+
+            sv.saver.restore(sess, tf.train.latest_checkpoint(A_checkpoint_dir))
+            a = sv.start_queue_runners(sess)
+
+            save_dir = os.path.join(work_dir, _SEMANTIC_PREDICTION_SAVE_FOLDER)
+
+            my_process_batch(sess,
+                           samples[common.ORIGINAL_IMAGE],
+                           predictions,
+                           samples[common.IMAGE_NAME],
+                           samples[common.HEIGHT],
+                           samples[common.WIDTH],
+                           save_dir)
+            
 
 def all_proc():
     # get_supervisor()
-    process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(10).jpg')
-    process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(11).jpg')
+    #process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(10).jpg')
+    #process_one('/DATA/ylxiong/homeplus/data_general/JPEGImages/building(11).jpg')
+    test()
 
 
 def serve(filepath):
