@@ -7,17 +7,18 @@ import build
 
 program_dir = '/home/chr/sgy/web/program'
 work_dir = os.path.join(program_dir, 'assets', 'datasets')
+work_dir = '/DATA/ylxiong/homeplus/'
 
-A_image_folder = os.path.join(work_dir, 'data', 'JPEGImages')
-A_list_folder  = os.path.join(work_dir, 'data', 'ImageSets', 'Segmentation')
-A_output_dir   = os.path.join(work_dir, 'tfrecord')
+A_image_folder = os.path.join(work_dir, 'test_data', 'JPEGImages')
+A_list_folder  = os.path.join(work_dir, 'test_data', 'ImageSets', 'Segmentation')
+A_output_dir   = os.path.join(work_dir, 'test_tfrecord')
 A_image_format = 'jpg'
 
 FLAGS = tf.app.flags.FLAGS
 
 
 tf.app.flags.DEFINE_string('image_folder',
-                           os.path.join(work_dir, 'data', 'JPEGImages'),
+                           os.path.join(work_dir, 'test_data', 'JPEGImages'),
                            'Folder containing images.')
 
 tf.app.flags.DEFINE_string(
@@ -27,12 +28,12 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_string(
     'list_folder',
-    os.path.join(work_dir, 'data', 'ImageSets', 'Segmentation'),
+    os.path.join(work_dir, 'test_data', 'ImageSets', 'Segmentation'),
     'Folder containing lists for training and validation')
 
 tf.app.flags.DEFINE_string(
     'output_dir',
-    os.path.join(work_dir, 'tfrecord'),
+    os.path.join(work_dir, 'test_tfrecord'),
     'Path to save converted SSTable of TensorFlow examples.')
 
 def _convert_dataset(dataset_split, sess, image_reader):

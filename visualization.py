@@ -2,6 +2,9 @@
 import numpy as np
 import math
 import os
+import sys
+sys.path = [i.replace('/home/ylxiong/models/research',
+                    '/home/yanglei/models/research') for i in sys.path]
 from deeplab.datasets import segmentation_dataset
 from deeplab.utils import input_generator, save_annotation
 from deeplab import common, model
